@@ -1,0 +1,201 @@
+import java.awt.*;
+import java.lang.*;
+import java.awt.event.*;					
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+import javax.swing.*;
+
+//获得创建窗口，监听鼠标的功能
+public class GameWin extends JFrame{
+
+	//在主类中定义一个状态用于控制游戏状态
+	static int state;								//0为未开始，1运行中，2商店，3失败,4胜利
+
+	List<Object> objectList = new ArrayList<>();	//创建数组存储金块，石块数组
+	Bg bg = new Bg();								//创建b g对象
+	Line line = new Line(this);					//创建L i n e对象,在new的同时传入Line（）构造方法
+
+	{
+		//定义一个布尔值，判断是否可以绘制金块
+		boolean recycle = true;
+		//生成黄金数量
+		for(int i = 0;i < 13;i++) {
+			double random = Math.random();			//生成随机数来控制不同大小金块的生成
+			Gold_ gold;								//将生成的金块传入该变量中
+			//将各个大小的金块传入gold进行检测
+			if(random<0.3) {
+				gold = new Gold_();					//小
+			}else if(random<0.7) {
+				gold = new GoldModerate();			//中
+			}else {
+				gold = new GoldMax();				//大
+			}
+
+			boolean intersect = false; // 默认不发生碰撞
+			for (int j = 0; j < objectList.size(); j++) {
+				if(gold.getRec().intersects(objectList.get(j).getRec())) {
+					intersect = true;
+				}
+			}
+			if (!intersect) {
+			objectList.add(gold);
+			} else {
+				i--;
+			}
+
+		}
+		System.out.println(objectList.size());
+		//生成石头数量
+		for(int i = 0;i < 4;i++) {
+			objectList.add(new Rock());				//在数组中调用石块绘制
+		}
+	}
+
+	//解决画面闪动问题
+	Image notFalsh;									//定义一个“不闪”画布
+
+	//初始化窗口信息
+	void launch() {
+		this.setVisible(true);						//设置窗口为可见
+		this.setSize(1176, 1088);					//设置窗口大小
+		this.setLocationRelativeTo(null);			//设置窗口位置
+		this.setTitle("GOLD");
+
+		setDefaultCloseOperation(EXIT_ON_CLOSE);	//关闭窗口
+
+
+		//插入鼠标事件
+		addMouseListener (new MouseAdapter() {
+			public void mouseClicked(MouseEvent e) {
+				super.mouseClicked(e);
+				//游戏状态的变化
+
+				switch(state) {
+					case 0:	
+						//点击鼠标右键，状态变化
+						if(e.getButton()==3) {
+							state = 1;							//游戏开始
+							//开始时间等于系统时间
+							bg.startTime = System.currentTimeMillis();
+						}
+						break;
+					case 1:
+						//如果左右摇摆点击了鼠标左键（1），那么线的状态变为1
+						if(e.getButton()==1 && line.state==0) {
+							line.state = 1;
+						}
+						//药水使用
+						//如果在抓取返回的时候点击鼠标右键，且药水不为零
+						if(e.getButton()==3&&line.state==3 && Bg.drugNum>0) {
+							Bg.drugFlag = true;
+							Bg.drugNum--;
+						}
+						break;
+					case 2:
+						Image mall = Toolkit.getDefaultToolkit().getImage("imgs/mall.png");
+						//商店使用
+						if(e.getButton()==1){
+							bg.shop=true;			//点击鼠标左键则为true，视为进入商店
+						}
+						if(e.getButton()==3) {		//点击鼠标右键则直接进入下一关
+							state=1;
+							//重置时间
+							bg.startTime=System.currentTimeMillis();
+						}
+						break;
+					case 3:
+						
+					case 4:
+						//鼠标左键进入下一关
+						if(e.getButton()==1) {
+							state = 0;
+							//重置元素
+							bg.reGame();
+							line.reGame();
+						}
+						break;
+					default:
+				}
+
+			}
+		});
+
+
+		while(true) {
+			repaint();								//在死循环中不停绘制
+			nextLevel();
+			if(Bg.count>bg.goal) {
+				nextLevel();							//调用下一关方法
+			}
+
+			try {
+				Thread.sleep(10);					//控制每次刷新的间隔
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+
+
+
+
+	}
+	//下一关的方法
+	public void nextLevel() {
+		//如果倒计时完成并还处于游戏状态为1
+		if(bg.gameTime() && state==1){
+            if(Bg.count >= bg.goal){
+            	//如果当前得分大于目标得分则过关
+                if(Bg.level==2) {							//如果关卡数等于5则游戏关卡结束，反之下一关
+                    state=4;
+                }
+                else {
+                    state = 2;								//进去商店
+                    Bg.level++;
+                }
+            }else {
+            	state=3;
+            }
+            dispose();
+            GameWin gameWin1 = new GameWin();
+            gameWin1.launch();
+        }
+
+	}
+
+
+
+	//调用paint函数
+	@Override
+	public void paint(Graphics g) {
+
+		//System.out.println(e.getButton());
+		notFalsh = this.createImage(1176, 1088);				//为“不闪”画布绘制大小
+		Graphics g_notFalsh = notFalsh.getGraphics();			//只要调用此画笔就是在“不闪”画布绘制
+		bg.paintSelf(g_notFalsh);
+		//当游戏状态为1时，才在窗口绘制线与物体
+		if(state==1) {
+			//System.out.println("Hello world");
+			for(Object obj:objectList) {
+			 obj.paintSelf(g_notFalsh);		 					//调佣gold对象的绘制方法
+			}
+			line.paintSelf(g_notFalsh); 						//调用l i n e对象绘线方法
+		}
+
+
+		g.drawImage(notFalsh, 0, 0, null);
+		//图像绘制于“不闪”画布后，再将此画布绘制于窗口之中
+		System.out.println(objectList.size());
+	}
+
+
+
+	public static void main(String [] args) {
+		GameWin gameWin = new GameWin();
+		//gameWin.objectList = null;
+		System.out.println(gameWin.objectList);
+		gameWin.launch();
+	}
+
+}
